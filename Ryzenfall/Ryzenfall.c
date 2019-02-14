@@ -36,9 +36,9 @@ int main(int ac, char *av[])
 
     //
     // Locate AMD PSP device by enumerating the loaded device drivers. If we 
-    // don't manage to find it, it doesn't definately mean that the system isn'
-    // t sporting a PSP but it was a good learning exercise for enumeration 
-    // via the SetupDi* API.
+    // don't manage to find it, it doesn't definately mean that the system 
+    // isn't sporting a PSP but it was a good learning exercise for  
+    // enumeration via the SetupDi* API.
     //
 
     hr = _findAmdPspDeviceLocation(&bus, &slot, &function, deviceDescription, sizeof(deviceDescription));

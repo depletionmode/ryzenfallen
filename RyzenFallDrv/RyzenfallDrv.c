@@ -92,6 +92,9 @@ FORCEINLINE BOOLEAN  _hasPspError (volatile PVOID);
 FORCEINLINE NTSTATUS _populateHmacLookupTable (BYTE[][HMAC_LEN]);
 FORCEINLINE NTSTATUS _readPaByteViaPsp (PHYSICAL_ADDRESS, BYTE *);
 
+#define POOL_TAG_(n) #@n    // https://docs.microsoft.com/en-us/cpp/preprocessor/charizing-operator-hash-at
+#define POOL_TAG(n) POOL_TAG_(n##nzR)
+
 //
 // Declare these here due to conflicts including ntifs.h
 //
@@ -441,11 +444,11 @@ PsppReadMemory (
 {
     NTSTATUS status;
     PEPROCESS process = NULL;
-    BYTE apcState[0x100];       // Allocate sufficient storage on the stack for opaque KAPC_STATE
-    BOOLEAN stackAttached = FALSE;
-    PHYSICAL_ADDRESS physicalAddress;
     BYTE hmac[HMAC_LEN];
     BYTE *buffer = Buffer;
+    PHYSICAL_ADDRESS physicalAddress;
+    BYTE apcState[0x100];   // Allocate sufficient storage on the stack for opaque KAPC_STATE.
+    BOOLEAN stackAttached = FALSE;
 
     PAGED_CODE();
 
@@ -535,7 +538,7 @@ PsppWriteMemory (
 
     PAGED_CODE()
 
-    return STATUS_INVALID_PARAMETER;
+    return STATUS_INVALID_DEVICE_REQUEST;
 }
 
 FORCEINLINE
@@ -606,6 +609,7 @@ _getPspMailboxAddress (
 {
     NTSTATUS status;
     PPSP_DRV_CONTEXT context;
+    ULONG pspBaseAddress;
 
     NT_ASSERT(Address != NULL);
 
@@ -631,7 +635,7 @@ _getPspMailboxAddress (
             // that reading the aforementioned MSR seems the popular method 
             // for determining the PSP base address.
             //
-            // I found an alternative way to discover the psp base in 
+            // I found an alternative method for discovering the PSP base in 
             // AmdPspDxeV2.efi (which is actually responsible for writing the 
             // address to MSR[0xc00110a2]:
             //
@@ -639,10 +643,10 @@ _getPspMailboxAddress (
             // pspBase = MEMORY[0xF80000BC] & 0xFFF00000;
             //
 
-#define MSR_PRIVATE_BLOCK_BASE_ADDRESS 0xc00110a2
+#define MSR_PSP_BASE 0xc00110a2
 
-            context->PspMailboxAddress = (ULONG)__readmsr(MSR_PRIVATE_BLOCK_BASE_ADDRESS);
-            if (0 == context->PspMailboxAddress) {
+            pspBaseAddress = (ULONG)__readmsr(MSR_PSP_BASE);
+            if (0 == pspBaseAddress) {
                 status = STATUS_UNSUCCESSFUL;
                 TraceEvents(TRACE_LEVEL_ERROR,
                             TRACE_DRIVER,
@@ -660,7 +664,7 @@ _getPspMailboxAddress (
 
 #define PSP_V2_MAILBOX_OFFSET 0x10570
 
-            context->PspMailboxAddress += PSP_V2_MAILBOX_OFFSET;
+            context->PspMailboxAddress = pspBaseAddress + PSP_V2_MAILBOX_OFFSET;
 
         } __except (EXCEPTION_EXECUTE_HANDLER) {
             status = GetExceptionCode();
@@ -689,7 +693,7 @@ end:
 
 #pragma pack(push, 1)
 typedef struct _PSP_CMD {
-    volatile BYTE ReturnedStatus;
+    volatile BYTE SecondaryStatus;
 
     BYTE Unknown;
 
@@ -704,7 +708,7 @@ typedef struct _PSP_CMD_BUFFER {
     ULONG Size;
     volatile ULONG Status;
 
-    volatile BYTE *Data[ANYSIZE_ARRAY];
+    volatile BYTE Data[ANYSIZE_ARRAY];
 
 } PSP_CMD_BUFFER, *PPSP_CMD_BUFFER;
 #define PSP_COMMAND_BUFFER_HEADER_SIZE (sizeof(PSP_CMD_BUFFER) - sizeof(((PPSP_CMD_BUFFER)0)->Data))
@@ -743,12 +747,8 @@ NTSTATUS _callPsp (
     }
 
     //
-    // Obtain the physical address of the command buffer and map the mailbox 
-    // IO space into system virtual address space.
+    // Map the mailbox IO space into system virtual address space.
     //
-
-    commandBufferVa = (PPSP_CMD_BUFFER)DataBuffer;
-    commandBufferPa = MmGetPhysicalAddress(commandBufferVa);
 
     commandVa = (PPSP_CMD)MmMapIoSpace(commandPa,
                                        sizeof(PSP_CMD),
@@ -764,7 +764,7 @@ NTSTATUS _callPsp (
     }
 
     //
-    // Ensure that the PSP. is ready to receive commands.
+    // Ensure that the PSP is ready to receive commands.
     //
 
     // TODO: test for HALT? _bittest(commandVa, 30)
@@ -790,6 +790,8 @@ NTSTATUS _callPsp (
     //       source and destination buffers.
     //
 
+    commandBufferVa = (PPSP_CMD_BUFFER)DataBuffer;
+    commandBufferPa = MmGetPhysicalAddress(commandBufferVa);
     commandVa->CommandBuffer = commandBufferPa.QuadPart;
     
     RtlMoveMemory((PVOID)commandBufferVa->Data, DataBuffer, DataLength);
@@ -798,7 +800,7 @@ NTSTATUS _callPsp (
     commandBufferVa->Status = 0;
     
     //
-    // Setting the command calls into the PSP for processing.
+    // Setting the command byte calls into the PSP for processing.
     //
 
     commandVa->Command = Command & 0xff;     // AmdPspDxeV2.efi: *(_DWORD *)mailbox_ptr_ = (unsigned __int8)cmd_ << 16;
@@ -891,7 +893,7 @@ _populateHmacLookupTable (
 
     for (idx = 0; idx < 0x100; idx++) {
         //
-        // 'Read' idx via the PSP.
+        // Ask the PSP to calculate the HMAC  of idx.
         //
 
         status = _readPaByteViaPsp(storagePa, Table[idx]);
@@ -923,7 +925,9 @@ _readPaByteViaPsp (
 
 #define SINGLE_BYTE_LENGTH 1    // We only calculate the hash on a single byte.
 
-    buffer = ExAllocatePoolWithTag(PagedPool, PSP_COMMAND_BUFFER_HEADER_SIZE + sizeof(PSP_DATA_INFO_BUFFER), 'fnzR');
+    buffer = ExAllocatePoolWithTag(NonPagedPoolNx, 
+                                   PSP_COMMAND_BUFFER_HEADER_SIZE + sizeof(PSP_DATA_INFO_BUFFER), 
+                                   POOL_TAG(1));
     if (NULL == buffer) {
         status = STATUS_INSUFFICIENT_RESOURCES;
         TraceEvents(TRACE_LEVEL_ERROR,
@@ -957,7 +961,7 @@ _readPaByteViaPsp (
 
 end:
     if (NULL != buffer) {
-        ExFreePoolWithTag(buffer, 'fnzR');
+        ExFreePoolWithTag(buffer, POOL_TAG(1));
         buffer = NULL;
     }
 

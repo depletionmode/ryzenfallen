@@ -519,6 +519,15 @@ end:
     return status;
 }
 
+//
+// MessageId: STATUS_REDACTED
+//
+// MessageText:
+//
+// The specified request requires you to practice responsible research.
+//
+#define STATUS_REDACTED    ((NTSTATUS)0xC000FEEDL)
+
 NTSTATUS
 PsppWriteMemory (
     _In_ PVOID Address,
@@ -538,7 +547,7 @@ PsppWriteMemory (
 
     PAGED_CODE()
 
-    return STATUS_INVALID_DEVICE_REQUEST;
+    return STATUS_REDACTED;
 }
 
 FORCEINLINE

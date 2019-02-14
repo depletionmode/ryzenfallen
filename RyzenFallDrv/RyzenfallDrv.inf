@@ -1,0 +1,84 @@
+;
+; RyzenFallDrv.inf
+;
+
+[Version]
+Signature="$WINDOWS NT$"
+Class=Insecurity devices
+ClassGuid={4719f3e5-f8b6-419d-b772-1de95c3b8de3}
+Provider=%ManufacturerName%
+CatalogFile=RyzenfallDrv.cat
+DriverVer=
+
+[DestinationDirs]
+DefaultDestDir = 12
+RyzenfallDrv_Device_CoInstaller_CopyFiles = 11
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+RyzenfallDrv.sys  = 1,,
+WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll=1 ; make sure the number matches with SourceDisksNames
+
+;*****************************************
+; Install Section
+;*****************************************
+
+[Manufacturer]
+%ManufacturerName%=Standard,NT$ARCH$
+
+[Standard.NT$ARCH$]
+%RyzenfallDrv.DeviceDesc%=RyzenfallDrv_Device, Root\RyzenfallDrv
+
+[RyzenfallDrv_Device.NT]
+CopyFiles=Drivers_Dir
+
+[Drivers_Dir]
+RyzenfallDrv.sys
+
+[RyzenfallDrv_Device.NT.HW]
+AddReg=RyzenfallDrv_AddReg
+
+[RyzenfallDrv_AddReg]
+HKR,,FriendlyName,,%RyzenfallDrv.DeviceDesc%
+
+;-------------- Service installation
+[RyzenfallDrv_Device.NT.Services]
+AddService = RyzenfallDrv,%SPSVCINST_ASSOCSERVICE%, RyzenfallDrv_Service_Inst
+
+; -------------- RyzenfallDrv driver install sections
+[RyzenfallDrv_Service_Inst]
+DisplayName    = %RyzenfallDrv.SVCDESC%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %12%\RyzenfallDrv.sys
+
+;
+;--- RyzenfallDrv_Device Coinstaller installation ------
+;
+
+[RyzenfallDrv_Device.NT.CoInstallers]
+AddReg=RyzenfallDrv_Device_CoInstaller_AddReg
+CopyFiles=RyzenfallDrv_Device_CoInstaller_CopyFiles
+
+[RyzenfallDrv_Device_CoInstaller_AddReg]
+HKR,,CoInstallers32,0x00010000, "WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll,WdfCoInstaller"
+
+[RyzenfallDrv_Device_CoInstaller_CopyFiles]
+WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll
+
+[RyzenfallDrv_Device.NT.Wdf]
+KmdfService =  RyzenfallDrv, RyzenfallDrv_wdfsect
+[RyzenfallDrv_wdfsect]
+KmdfLibraryVersion = $KMDFVERSION$
+
+[Strings]
+SPSVCINST_ASSOCSERVICE= 0x00000002
+ManufacturerName="David Kaplan - @depletionmode"
+ClassName="Insecurity devices"
+DiskName = "RyzenfallDrv Installation Disk"
+RyzenfallDrv.DeviceDesc = "Ryzenfall Research Device"
+RyzenfallDrv.SVCDESC = "RyzenfallDrv Service"
+REG_MULTI_SZ = 0x00010000

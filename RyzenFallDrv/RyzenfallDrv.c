@@ -526,7 +526,7 @@ end:
 //
 // The specified request requires you to practice responsible research.
 //
-#define STATUS_REDACTED    ((NTSTATUS)0xC000FEEDL)
+#define STATUS_REDACTED    ((NTSTATUS)0xC0DEFEEDL)
 
 NTSTATUS
 PsppWriteMemory (

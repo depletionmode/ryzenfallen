@@ -627,9 +627,9 @@ _getPspMailboxAddress (
     if (0 == context->PspMailboxAddress) {
         __try {
             //
-            // If Coreboot is any indication as to what goes on in the rotten 
-            // carcass that is some closed-source firmware implementations, 
-            // MSR[0xc00110a2] seems to be be written to with the PCIe Bar3 
+            // If Coreboot is any indication as to what goes on in some 
+            // closed-source firmware implementations, 
+            // MSR[0xc00110a2] is apparantly be written to with the PCIe Bar3 
             // address of the PSP base by the firmware during boot (undocumented 
             // publically - other than in Coreboot). This seems to be the most 
             // straightforward way of obtaining the PSP base address post-boot 

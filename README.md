@@ -16,7 +16,7 @@ The write-what-where functionality has been redaced from the public release of t
 
 The impetus for releasing this work at this time is that sufficient details for reproduction of the vulnerability have now been made public in the recent BlueHatIL presentation by the original finders from CTS Labs.
 
-*Tested on my Ryzen 2700X, Gigabyte AX370 Gaming 5 running a maximum firmware version of F23).*
+*Tested on my Ryzen 2700X, Gigabyte AX370 Gaming 5 running a maximum firmware version of F23.*
 
 ## Patching
 
